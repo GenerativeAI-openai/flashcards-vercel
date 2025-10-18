@@ -1,0 +1,14 @@
+{
+  "name": "flashcards-vercel",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.12"
+  },
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  }
+}
