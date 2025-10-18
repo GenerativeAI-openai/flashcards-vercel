@@ -1,8 +1,8 @@
 {
   "functions": {
     "api/define.js": {
-      "runtime": "@vercel/node@3",
-      "maxDuration": 13
+      "runtime": "@vercel/node@3.1.7",
+      "maxDuration": 10
     }
   }
 }
