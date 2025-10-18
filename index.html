@@ -134,11 +134,10 @@ elStart=q("#btnStart"),elPrev=q("#btnPrev"),elNext=q("#btnNext"),elFlipBtn=q("#b
 flip=q("#flip"),frontW=q("#frontWord"),frontI=q("#frontIdx"),backM=q("#backMeaning"),backI=q("#backIdx");
 function q(s){return document.querySelector(s)}
 function esc(s){return (s||"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
-function renderAuto(){elAutoLabel.textContent=st.auto?"ON":"OFF";elAutoDot.className="dot "+(st.auto?"on":"off");
-  elAutoBtn.style.display=st.auto?"inline-flex":"none";}
+function renderAuto(){elAutoLabel.textContent=st.auto?"ON":"OFF";elAutoDot.className="dot "+(st.auto?"on":"off");elAutoBtn.style.display=st.auto?"inline-flex":"none";}
 function renderList(){elList.innerHTML="";
   st.cards.forEach((c,i)=>{const d=document.createElement("div");d.className="item";
-    d.innerHTML=`<h4>${esc(c.word)}</h4><p>${esc(c.meaning)}</p>
+    d.innerHTML=`<h4>${esc(c.word)}</h4><p>${esc(c.meaning||"(뜻 대기 중)")}</p>
     <div class="toolbar"><button class='btn' data-act='go' data-i='${i}'>이 카드로</button>
     <button class='btn danger' data-act='del' data-i='${i}'>삭제</button></div>`;
     elList.appendChild(d);});}
@@ -151,41 +150,73 @@ function setFlip(v){st.flip=v;flip.classList.toggle("is-flipped",v);}
 function updateFetchUI(){elCancel.style.display=st.fetching?"inline-flex":"none";
   elStatus.innerHTML=st.fetching?'<span class="spinner"></span> 불러오는 중…':"";}
 elToggle.onclick=()=>{st.auto=!st.auto;saveAuto();renderAuto();}
+
+/* ✅ 카드 추가 버튼 */
 elAdd.onclick=()=>{
   const w=elWord.value.trim(),m=elMean.value.trim();
   if(!w){alert("단어를 입력하세요.");return;}
   if(!m && !st.auto){alert("뜻을 입력하거나 자동완성을 켜세요.");return;}
-  st.cards.push({word:w,meaning:m});saveCards();
-  elWord.value=elMean.value="";renderList();renderStage();setFlip(false);
+  const newCard={word:w,meaning:m||null};
+  st.cards.push(newCard);
+  saveCards();renderList();renderStage();setFlip(false);
+
+  // ✅ 자동완성 ON + 뜻 비어있으면 자동 요청
+  if(st.auto && !m){
+    const index = st.cards.length - 1;
+    fetch(`/api/define?q=${encodeURIComponent(w)}`)
+      .then(r=>r.json())
+      .then(d=>{
+        if(d.ok && d.meaning){
+          st.cards[index].meaning=d.meaning;
+          saveCards();renderList();
+        }
+      })
+      .catch(e=>{
+        console.warn("자동완성 실패:", e);
+      });
+  }
+
+  elWord.value=elMean.value="";
 };
+
+/* 나머지 기본 버튼들 동일 */
 elClear.onclick=()=>{if(confirm("모두 삭제할까요?")){st.cards=[];saveCards();renderList();renderStage();}}
 elPrev.onclick=()=>{if(!st.cards.length)return;st.idx=(st.idx-1+st.cards.length)%st.cards.length;renderStage();setFlip(false);}
 elNext.onclick=()=>{if(!st.cards.length)return;st.idx=(st.idx+1)%st.cards.length;renderStage();setFlip(false);}
 elFlipBtn.onclick=()=>setFlip(!st.flip);flip.onclick=()=>setFlip(!st.flip);
 elList.onclick=e=>{
  const b=e.target.closest("button");if(!b)return;
- const i=+b.dataset.i,act=b.dataset.act;if(act==="del"){st.cards.splice(i,1);saveCards();renderList();renderStage();}
+ const i=+b.dataset.i,act=b.dataset.act;
+ if(act==="del"){st.cards.splice(i,1);saveCards();renderList();renderStage();}
  else if(act==="go"){st.idx=i;renderStage();setFlip(false);window.scrollTo({top:0,behavior:"smooth"});}
 };
+/* 수동 자동완성 버튼 */
 elAutoBtn.onclick=async()=>{
  const w=elWord.value.trim();if(!w){alert("단어 입력하세요.");return;}
  st.abort=new AbortController();st.fetching=true;updateFetchUI();
  try{
    const r=await fetch(`/api/define?q=${encodeURIComponent(w)}`,{signal:st.abort.signal});
-   const d=await r.json();if(d.ok&&d.meaning){elMean.value=d.meaning;elStatus.textContent="자동 완성 완료";}
+   const d=await r.json();
+   if(d.ok&&d.meaning){elMean.value=d.meaning;elStatus.textContent="자동 완성 완료";}
    else{elStatus.textContent="결과 없음(추가 가능)";}
  }catch(e){if(e.name!=="AbortError")elStatus.textContent="오류: "+e.message;}
  finally{st.fetching=false;updateFetchUI();}
 };
 elCancel.onclick=()=>{try{st.abort?.abort();}catch{}st.fetching=false;updateFetchUI();elStatus.textContent="취소됨";}
+
+/* 연습 시작/중지 로직 (원본 복원 포함) */
 elStart.onclick=()=>{
  if(!st.cards.length){alert("카드를 추가하세요.");return;}
  st.study=!st.study;
  if(st.study){
-   shuffle(st.cards);saveCards();st.idx=0;renderStage();setFlip(false);
+   st.originalCards=[...st.cards];
+   shuffle(st.cards);
+   saveCards();st.idx=0;renderStage();setFlip(false);
    elStart.textContent="연습 중지";elStart.classList.remove("success");elStart.classList.add("danger");
    elList.style.display="none";
  }else{
+   if(st.originalCards) st.cards=[...st.originalCards];
+   renderList();saveCards();renderStage();
    elStart.textContent="연습 시작";elStart.classList.remove("danger");elStart.classList.add("success");
    elList.style.display="grid";
  }
