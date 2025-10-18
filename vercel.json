@@ -1,0 +1,8 @@
+{
+  "functions": {
+    "api/define.js": {
+      "runtime": "nodejs18.x",
+      "maxDuration": 13
+    }
+  }
+}
