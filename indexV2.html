@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>플래시카드</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#ffffff;--fg:#111;--muted:#666;--border:#e6e6e6;
+      --primary:#111;--accent:#0a7cff;--success:#10b981;--danger:#ef4444;
+      --card:#fafafa;--shadow:0 6px 24px rgba(0,0,0,0.08);--radius:18px;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR";}
+    .wrap{max-width:980px;margin:0 auto;padding:24px}
+    .topbar{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px}
+    .brand{font-weight:700;font-size:20px}
+    .settings{display:flex;align-items:center;gap:12px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .row > * {flex:1 1 280px}
+    label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
+    input,textarea{width:100%;padding:12px 14px;border:1px solid var(--border);
+      border-radius:12px;background:#fff;font-size:14px}
+    textarea{min-height:92px;resize:vertical}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;
+      padding:10px 14px;border-radius:12px;border:1px solid var(--border);
+      background:#fff;color:var(--fg);cursor:pointer;font-weight:600;}
+    .btn:hover{background:#f6f6f6}
+    .btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+    .btn.accent{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .btn.success{background:var(--success);color:#fff;border-color:var(--success)}
+    .btn.danger{background:var(--danger);color:#fff;border-color:var(--danger)}
+    .hint{font-size:12px;color:var(--muted)}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap}
+    .list{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:12px}
+    .item{background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px}
+    .item h4{margin:0 0 6px 0;font-size:15px}
+    .item p{margin:0;color:#333;font-size:14px;white-space:pre-wrap}
+    .stage{display:flex;justify-content:center;align-items:center;margin-top:20px}
+    .flip{width:360px;height:220px;perspective:1000px;}
+    .flip-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;
+      transition:transform .6s cubic-bezier(.22,.61,.36,1);}
+    .flip.is-flipped .flip-inner{transform:rotateY(180deg)}
+    .face{position:absolute;inset:0;background:#fff;border:1px solid var(--border);
+      border-radius:20px;box-shadow:var(--shadow);display:flex;align-items:center;
+      justify-content:center;padding:24px;backface-visibility:hidden;}
+    .face.back{transform:rotateY(180deg)}
+    .big{font-size:26px;font-weight:700;text-align:center}
+    .small{font-size:14px;color:var(--muted);margin-top:6px;text-align:center}
+    .spacer{height:14px}
+    .right{margin-left:auto}
+    .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);
+      background:#fff;border-radius:999px;padding:6px 10px;font-size:12px}
+    .dot{width:8px;height:8px;border-radius:50%}
+    .dot.on{background:var(--success)} .dot.off{background:#bbb}
+    .spinner{display:inline-block;width:16px;height:16px;border:2px solid #ddd;border-top-color:#888;
+      border-radius:50%;animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* ✅ flip 상태 전환 시 back face 잠깐 보이는 버그 방지 */
+    .flip-inner.animating .face.back {
+      visibility:hidden;
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">플래시카드</div>
+    <div class="settings">
+      <span class="pill"><span id="autoDot" class="dot off"></span> 자동 완성: <b id="autoLabel">OFF</b></span>
+      <button id="toggleAuto" class="btn">토글</button>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="row">
+      <div>
+        <label>단어</label>
+        <input id="word" type="text" placeholder="예: apple">
+      </div>
+      <div>
+        <label>뜻</label>
+        <textarea id="meaning" placeholder="뜻을 직접 입력하거나 자동완성하세요."></textarea>
+        <div class="spacer"></div>
+        <div class="toolbar">
+          <button id="btnAuto" class="btn accent">자동 완성</button>
+          <button id="btnCancel" class="btn">직접 입력</button>
+          <span id="autoStatus" class="hint"></span>
+          <div class="right"></div>
+          <button id="btnAdd" class="btn primary">카드 추가</button>
+          <button id="btnClear" class="btn danger">전체 삭제</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <button id="btnStart" class="btn success">연습 시작</button>
+      <button id="btnPrev" class="btn">이전</button>
+      <button id="btnNext" class="btn">다음</button>
+      <button id="btnFlip" class="btn">뒤집기</button>
+    </div>
+
+    <div class="stage">
+      <div id="flip" class="flip">
+        <div class="flip-inner">
+          <div class="face front">
+            <div><div id="frontWord" class="big">카드를 추가하세요</div><div id="frontIdx" class="small">—</div></div>
+          </div>
+          <div class="face back">
+            <div><div id="backMeaning" class="big">뜻</div><div id="backIdx" class="small">—</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:18px;margin-bottom:8px">내 카드</h3>
+    <div id="list" class="list"></div>
+  </div>
+</div>
+
+<script>
+const LS_CARDS="fc_cards_v1",LS_AUTO="fc_auto_v1";
+const st={cards:[],idx:0,flip:false,auto:false,fetching:false,abort:null,study:false};
+
+function load(){try{st.cards=JSON.parse(localStorage.getItem(LS_CARDS)||"[]")}catch{} st.auto=localStorage.getItem(LS_AUTO)==="1";}
+function saveCards(){localStorage.setItem(LS_CARDS,JSON.stringify(st.cards));}
+function saveAuto(){localStorage.setItem(LS_AUTO,st.auto?"1":"0");}
+function clamp(x,a,b){return Math.max(a,Math.min(b,x));}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+const elWord=q("#word"),elMean=q("#meaning"),elList=q("#list"),
+elAdd=q("#btnAdd"),elClear=q("#btnClear"),elAutoBtn=q("#btnAuto"),
+elCancel=q("#btnCancel"),elStatus=q("#autoStatus"),
+elAutoDot=q("#autoDot"),elAutoLabel=q("#autoLabel"),elToggle=q("#toggleAuto"),
+elStart=q("#btnStart"),elPrev=q("#btnPrev"),elNext=q("#btnNext"),elFlipBtn=q("#btnFlip"),
+flip=q("#flip"),frontW=q("#frontWord"),frontI=q("#frontIdx"),backM=q("#backMeaning"),backI=q("#backIdx");
+
+function q(s){return document.querySelector(s)}
+function esc(s){return (s||"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+
+function renderAuto(){elAutoLabel.textContent=st.auto?"ON":"OFF";elAutoDot.className="dot "+(st.auto?"on":"off");elAutoBtn.style.display=st.auto?"inline-flex":"none";}
+function renderList(){elList.innerHTML="";
+  st.cards.forEach((c,i)=>{const d=document.createElement("div");d.className="item";
+    d.innerHTML=`<h4>${esc(c.word)}</h4><p>${esc(c.meaning||"(뜻 대기 중)")}</p>
+    <div class="toolbar"><button class='btn' data-act='go' data-i='${i}'>이 카드로</button>
+    <button class='btn danger' data-act='del' data-i='${i}'>삭제</button></div>`;
+    elList.appendChild(d);});}
+
+/* ✅ 수정된 flip glitch fix 적용된 renderStage() */
+function renderStage(){
+  if(!st.cards.length){
+    frontW.textContent="카드를 추가하세요";
+    backM.textContent="뜻";
+    frontI.textContent=backI.textContent="—";
+    return;
+  }
+
+  flip.classList.remove("is-flipped");
+  flip.querySelector(".flip-inner").classList.add("animating");
+  st.flip=false;
+
+  const i = clamp(st.idx,0,st.cards.length-1);
+  const c = st.cards[i];
+
+  requestAnimationFrame(()=>{
+    frontW.textContent = c.word;
+    backM.textContent = c.meaning || "(빈 뜻)";
+    frontI.textContent = backI.textContent = `${i+1}/${st.cards.length}`;
+  });
+}
+
+/* flip transition end 이벤트로 animating 제거 */
+flip.querySelector(".flip-inner").addEventListener("transitionend",()=>{
+  flip.querySelector(".flip-inner").classList.remove("animating");
+});
+
+function setFlip(v){
+  st.flip=v;
+  flip.classList.toggle("is-flipped",v);
+  flip.querySelector(".flip-inner").classList.add("animating");
+}
+
+elToggle.onclick=()=>{st.auto=!st.auto;saveAuto();renderAuto();}
+
+elAdd.onclick=()=>{
+  const w=elWord.value.trim(),m=elMean.value.trim();
+  if(!w){alert("단어를 입력하세요.");return;}
+  if(!m && !st.auto){alert("뜻을 입력하거나 자동완성을 켜세요.");return;}
+  const newCard={word:w,meaning:m||null};
+  st.cards.push(newCard);
+  saveCards();renderList();renderStage();setFlip(false);
+
+  if(st.auto && !m){
+    const idx = st.cards.length-1;
+    fetch(`/api/define?q=${encodeURIComponent(w)}`)
+      .then(r=>r.json()).then(d=>{if(d.ok&&d.meaning){st.cards[idx].meaning=d.meaning;saveCards();renderList();}})
+      .catch(e=>console.warn("자동완성 실패:",e));
+  }
+
+  elWord.value=elMean.value="";
+};
+
+elClear.onclick=()=>{if(confirm("모두 삭제할까요?")){st.cards=[];saveCards();renderList();renderStage();}}
+elPrev.onclick=()=>{if(!st.cards.length)return;st.idx=(st.idx-1+st.cards.length)%st.cards.length;renderStage();}
+elNext.onclick=()=>{if(!st.cards.length)return;st.idx=(st.idx+1)%st.cards.length;renderStage();}
+elFlipBtn.onclick=()=>setFlip(!st.flip);flip.onclick=()=>setFlip(!st.flip);
+
+elList.onclick=e=>{
+ const b=e.target.closest("button");if(!b)return;
+ const i=+b.dataset.i,act=b.dataset.act;
+ if(act==="del"){st.cards.splice(i,1);saveCards();renderList();renderStage();}
+ else if(act==="go"){st.idx=i;renderStage();setFlip(false);window.scrollTo({top:0,behavior:"smooth"});}
+};
+
+elAutoBtn.onclick=async()=>{
+ const w=elWord.value.trim();if(!w){alert("단어 입력하세요.");return;}
+ st.abort=new AbortController();st.fetching=true;updateFetchUI();
+ try{
+   const r=await fetch(`/api/define?q=${encodeURIComponent(w)}`,{signal:st.abort.signal});
+   const d=await r.json();
+   if(d.ok&&d.meaning){elMean.value=d.meaning;elStatus.textContent="자동 완성 완료";}
+   else{elStatus.textContent="결과 없음(추가 가능)";}
+ }catch(e){if(e.name!=="AbortError")elStatus.textContent="오류: "+e.message;}
+ finally{st.fetching=false;updateFetchUI();}
+};
+
+function updateFetchUI(){elCancel.style.display=st.fetching?"inline-flex":"none";
+  elStatus.innerHTML=st.fetching?'<span class="spinner"></span> 불러오는 중…':"";}
+
+elCancel.onclick=()=>{try{st.abort?.abort();}catch{}st.fetching=false;updateFetchUI();elStatus.textContent="취소됨";}
+
+elStart.onclick=()=>{
+ if(!st.cards.length){alert("카드를 추가하세요.");return;}
+ st.study=!st.study;
+ if(st.study){
+   st.originalCards=[...st.cards];
+   shuffle(st.cards);
+   saveCards();st.idx=0;renderStage();setFlip(false);
+   elStart.textContent="연습 중지";elStart.classList.remove("success");elStart.classList.add("danger");
+   elList.style.display="none";
+ }else{
+   if(st.originalCards) st.cards=[...st.originalCards];
+   renderList();saveCards();renderStage();
+   elStart.textContent="연습 시작";elStart.classList.remove("danger");elStart.classList.add("success");
+   elList.style.display="grid";
+ }
+};
+
+load();renderAuto();renderList();renderStage();updateFetchUI();
+</script>
+</body>
+</html>
