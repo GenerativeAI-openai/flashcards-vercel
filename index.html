@@ -121,55 +121,42 @@ border-radius:50%;animation:spin 1s linear infinite}
 
 
 <script>
-/* -----------------------------
-   상태
------------------------------ */
+/* 상태 */
 const LS_CARDS="fc_cards_v1",LS_AUTO="fc_auto_v1";
 const st={cards:[],idx:0,flip:false,auto:false};
 
-/* -----------------------------
-   도구
------------------------------ */
+/* 셀렉터 */
 const q=s=>document.querySelector(s);
+const elWord=q("#word"),elMean=q("#meaning"),elList=q("#list"),
+autoDot=q("#autoDot"),autoLabel=q("#autoLabel"),elStatus=q("#autoStatus"),
+flip=q("#flip"),frontW=q("#frontWord"),frontI=q("#frontIdx"),backM=q("#backMeaning"),backI=q("#backIdx");
+
+/* 유틸 */
 const esc=s=>(s||"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 
-/* -----------------------------
-   요소
------------------------------ */
-const elWord=q("#word"),elMean=q("#meaning"),elList=q("#list"),
-elAutoDot=q("#autoDot"),elAutoLabel=q("#autoLabel"),elStatus=q("#autoStatus"),
-flip=q("#flip"),frontW=q("#frontWord"),frontI=q("#frontIdx"),backM=q("#backMeaning"),backI=q("#backIdx");
-
-/* -----------------------------
-   로드/저장
------------------------------ */
-function load(){
-  try{st.cards=JSON.parse(localStorage.getItem(LS_CARDS)||"[]")}catch{}
-  st.auto=localStorage.getItem(LS_AUTO)==="1";
-}
+/* 저장 */
+function load(){try{st.cards=JSON.parse(localStorage.getItem(LS_CARDS)||"[]")}catch{}st.auto=localStorage.getItem(LS_AUTO)==="1";}
 function saveCards(){localStorage.setItem(LS_CARDS,JSON.stringify(st.cards));}
 function saveAuto(){localStorage.setItem(LS_AUTO,st.auto?"1":"0");}
+function renderAuto(){autoLabel.textContent=st.auto?"ON":"OFF";autoDot.className="dot "+(st.auto?"on":"off");}
 
-/* -----------------------------
-   자동완성 표시
------------------------------ */
-function renderAuto(){
-  elAutoLabel.textContent=st.auto?"ON":"OFF";
-  elAutoDot.className="dot "+(st.auto?"on":"off");
-}
-
-/* -----------------------------
-   카드 렌더
------------------------------ */
-let pendingCard=null;
-
+/* 카드 표시 */
 function applyCard(c){
   frontW.textContent=c.word;
   backM.textContent=c.meaning||"(빈 뜻)";
   frontI.textContent=backI.textContent=`${st.idx+1}/${st.cards.length}`;
 }
 
+/* flip 강제 앞면 */
+function forceFront(){
+  const inner = flip.querySelector(".flip-inner");
+  inner.style.transition="none";
+  setFlip(false);
+  requestAnimationFrame(()=>{ inner.style.transition=""; });
+}
+
+/* 렌더 */
 function renderStage(){
   if(!st.cards.length){
     applyCard({word:"카드를 추가하세요",meaning:"뜻"});
@@ -177,49 +164,41 @@ function renderStage(){
     return;
   }
 
-  pendingCard = st.cards[st.idx];
+  const c = st.cards[st.idx];
 
-  // 👉 뒤집힌 상태에서 넘길 경우: 즉시 앞면 표시 후 텍스트 갱신
   if(st.flip){
-    setFlip(false);               // 앞면으로 돌림
-    applyCard(pendingCard);       // 즉시 새 카드 내용 표시
-    pendingCard=null;
+    forceFront();
+    applyCard(c);  // 즉시 반영
   } else {
-    applyCard(pendingCard);
-    pendingCard=null;
+    applyCard(c);
   }
 }
 
-/* flip 애니메이션 끝났을 때 (백업 안전장치) */
-flip.querySelector(".flip-inner").addEventListener("transitionend",()=>{
-  if(pendingCard){ applyCard(pendingCard); pendingCard=null; }
-});
-
-/* -----------------------------
-   Flip
------------------------------ */
+/* flip */
 function setFlip(v){
   st.flip=v;
   flip.classList.toggle("is-flipped",v);
 }
+q("#btnFlip").onclick=()=>setFlip(!st.flip);
+flip.onclick=()=>setFlip(!st.flip);
 
-/* -----------------------------
-   카드 이동
------------------------------ */
-function nextCard(){
-  if(!st.cards.length)return;
-  st.idx=(st.idx+1)%st.cards.length;
-  renderStage();
-}
-function prevCard(){
-  if(!st.cards.length)return;
-  st.idx=(st.idx-1+st.cards.length)%st.cards.length;
-  renderStage();
-}
+/* 이동 */
+function nextCard(){if(!st.cards.length)return;st.idx=(st.idx+1)%st.cards.length;renderStage();}
+function prevCard(){if(!st.cards.length)return;st.idx=(st.idx-1+st.cards.length)%st.cards.length;renderStage();}
 
-/* -----------------------------
-   리스트 렌더
------------------------------ */
+q("#btnPrev").onclick=prevCard;
+q("#btnNext").onclick=nextCard;
+
+/* 스와이프 */
+let sx=0;
+flip.addEventListener("touchstart",e=>sx=e.touches[0].clientX);
+flip.addEventListener("touchend",e=>{
+  const dx=e.changedTouches[0].clientX-sx;
+  if(Math.abs(dx)<40)return;
+  dx<0?nextCard():prevCard();
+});
+
+/* 리스트 */
 function renderList(){
   elList.innerHTML="";
   st.cards.forEach((c,i)=>{
@@ -233,42 +212,25 @@ function renderList(){
     elList.appendChild(d);
   });
 }
+elList.onclick=e=>{
+  const b=e.target.closest("button");if(!b)return;
+  const i=+b.dataset.i;
+  if(b.dataset.act==="del"){
+    st.cards.splice(i,1);saveCards();renderList();renderStage();
+  }else{
+    st.idx=i;renderStage();setFlip(false);scrollTo({top:0,behavior:"smooth"});
+  }
+};
 
-/* -----------------------------
-   UI 버튼
------------------------------ */
-q("#btnFlip").onclick=()=>setFlip(!st.flip);
-flip.onclick=()=>setFlip(!st.flip);
-
-q("#btnPrev").onclick=prevCard;
-q("#btnNext").onclick=nextCartd=nextCard;
-
-/* -----------------------------
-   스와이프
------------------------------ */
-let startX=0;
-flip.addEventListener("touchstart",e=>startX=e.touches[0].clientX);
-flip.addEventListener("touchend",e=>{
-  const dx=e.changedTouches[0].clientX-startX;
-  if(Math.abs(dx)<40)return;
-  dx<0?nextCard():prevCard();
-});
-
-/* -----------------------------
-   카드 추가 + 자동완성 fetch
------------------------------ */
+/* 카드 추가 + 자동완성 */
 q("#btnAdd").onclick=()=>{
   const w=elWord.value.trim(),m=elMean.value.trim();
   if(!w)return alert("단어 입력");
-  if(!m && !st.auto)return alert("뜻 입력하거나 자동완성 켜세요");
+  if(!m && !st.auto)return alert("뜻 입력 또는 자동완성 켜기");
 
   const c={word:w,meaning:m||null};
-  st.cards.push(c);
-  saveCards();renderList();
-
-  st.idx=st.cards.length-1;
-  renderStage();
-  setFlip(false);
+  st.cards.push(c);saveCards();renderList();
+  st.idx=st.cards.length-1;renderStage();setFlip(false);
 
   if(st.auto && !m){
     const idx=st.idx;
@@ -285,11 +247,10 @@ q("#btnAdd").onclick=()=>{
   elWord.value=elMean.value="";
 };
 
-/* 수동 자동완성 버튼 */
+/* 수동 자동완성 */
 q("#btnAuto").onclick=async()=>{
   const w=elWord.value.trim();
   if(!w)return alert("단어 입력");
-
   elStatus.innerHTML="<span class='spinner'></span> 로딩...";
   try{
     const r=await fetch(`/api/define?q=${encodeURIComponent(w)}`);
@@ -298,24 +259,12 @@ q("#btnAuto").onclick=async()=>{
     else elStatus.textContent="없음";
   }catch{elStatus.textContent="오류";}
 };
+q("#btnCancel").onclick=()=>elStatus.textContent="";
 
-/* -----------------------------
-   기타
------------------------------ */
 q("#toggleAuto").onclick=()=>{st.auto=!st.auto;saveAuto();renderAuto();};
-q("#btnClear").onclick=()=>{if(confirm("모두 삭제?")){st.cards=[];saveCards();renderList();renderStage();}};
-q("#btnCancel").onclick=()=>{elStatus.textContent="";};
+q("#btnClear").onclick=()=>{if(confirm("정말 삭제?")){st.cards=[];saveCards();renderList();renderStage();}};
 
-elList.onclick=e=>{
-  const b=e.target.closest("button");if(!b)return;
-  const i=+b.dataset.i;
-  if(b.dataset.act==="del"){
-    st.cards.splice(i,1);saveCards();renderList();renderStage();
-  }else{
-    st.idx=i;renderStage();setFlip(false);scrollTo({top:0,behavior:"smooth"});
-  }
-};
-
+/* 연습 모드 */
 q("#btnStart").onclick=()=>{
   if(!st.cards.length)return alert("카드 없음");
   st.study=!st.study;
@@ -327,17 +276,16 @@ q("#btnStart").onclick=()=>{
     q("#btnStart").textContent="연습 중지";
     q("#btnStart").classList.replace("success","danger");
     elList.style.display="none";
-  }else{
-    st.cards=[...st.original];saveCards();renderList();renderStage();
+  } else {
+    st.cards=[...st.original];
+    saveCards();renderList();renderStage();
     q("#btnStart").textContent="연습 시작";
     q("#btnStart").classList.replace("danger","success");
     elList.style.display="grid";
   }
 };
 
-/* -----------------------------
-   Init
------------------------------ */
+/* 시작 */
 load();renderAuto();renderList();renderStage();
 </script>
 </body>
